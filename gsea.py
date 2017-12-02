@@ -46,4 +46,5 @@ for i in range(len(genes)):
     dif_expr.append(expr_ALL-expr_AML)# negative values indicate a gene expressed (in average) more by AML patients
 
 index_sort = np.argsort(dif_expr)
+plt.plot(np.sort(dif_expr))
 plt.show()
