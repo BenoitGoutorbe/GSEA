@@ -35,7 +35,7 @@ for line in content :
 print(len(pathways),"sets of genes used of the analysis")
 
 # Calculate the Enrichment score
-size = [len(p)for p in genes_sets]# number of genes implicated in each pathway
+size = [len(p)for p in genes_sets] # number of genes implicated in each pathway
 ALL_index = [i for i in range(len(patients)) if patients[i] == 'ALL']
 AML_index = [i for i in range(len(patients)) if patients[i] == 'AML']
 dif_expr = []
@@ -43,8 +43,12 @@ dif_expr = []
 for i in range(len(genes)):
     expr_ALL = np.mean([data[i,j] for j in ALL_index])
     expr_AML = np.mean([data[i,j] for j in AML_index])
-    dif_expr.append(expr_ALL-expr_AML)# negative values indicate a gene expressed (in average) more by AML patients
+    dif_expr.append(expr_ALL-expr_AML) # negative values indicate a gene expressed (in average) more by AML patients
 
+# sorting the genes by correlation with phenotye
 index_sort = np.argsort(dif_expr)
-plt.plot(np.sort(dif_expr))
+genes = [genes[i] for i in index_sort]
+data = np.matrix([data[i,].tolist()[0] for i in index_sort])
+dif_expr = [dif_expr[i] for i in index_sort]
+plt.plot(dif_expr)
 plt.show()
