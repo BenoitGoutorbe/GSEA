@@ -1,71 +1,82 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-# reading the expression file
-file = open("leukemia.txt", "r")
-content = file.readlines()
-file.close()
+class gsea:
+    def __init__(self, expression_file, pathway_file):
+        # reading the expression file
+        file = open(expression_file, "r")
+        content = file.readlines()
+        file.close()
 
-patients = [] # patients category (ALL or AML)
-genes = [] # name of the genes (headers)
-expr = [] # table with expression levels
-patients = content[0].split()[1:]
-for line in content[1:] :
-    genes.append(line.split()[0])
-    expr.append([int(value) for value in line.split()[1:]])
-NB_genes = len(genes)
-NB_patients = len(patients)
-print("Expression levels of", NB_genes, "genes for",NB_patients, "patients")
+        self.patients = [] # patients category (ALL or AML)
+        self.genes = [] # name of the genes (headers)
+        expr = [] # table with expression levels
+        self.patients = content[0].split()[1:]
+        for line in content[1:] :
+            self.genes.append(line.split()[0])
+            expr.append([int(value) for value in line.split()[1:]])
+        self.NB_genes = len(self.genes)
+        self.NB_patients = len(self.patients)
+        print("Expression levels of", self.NB_genes, "genes for",self.NB_patients, "patients")
 
-data = np.matrix(expr)
+        self.expr_matrix = np.matrix(expr)
 
-# reading the patwhays file
-file = open("pathways.txt", "r")
-content = file.readlines()
-file.close()
+        # reading the patwhays file
+        file = open(pathway_file, "r")
+        content = file.readlines()
+        file.close()
 
-MIN_SIZE = 15
-pathways = [] # name of the pathways
-genes_sets = [] # name of the genes implicated in each pathway
-# NOTE : we keep only the genes sets with at least MIN_SIZE (15) genes for which we have expression data
-for line in content :
-    genes_implicated = [g for g in line.split()[1:] if g in genes]
-    if len(genes_implicated) >= MIN_SIZE :
-        pathways.append(line.split()[0])
-        genes_sets.append(genes_implicated)
-NB_sets = len(pathways)
-print(NB_sets,"sets of genes used of the analysis")
+        MIN_SIZE = 15
+        self.pathways = [] # name of the pathways
+        self.genes_sets = [] # name of the genes implicated in each pathway
+        # NOTE : we keep only the genes sets with at least MIN_SIZE (15) genes for which we have expression data
+        for line in content :
+            genes_implicated = [g for g in line.split()[1:] if g in self.genes]
+            if len(genes_implicated) >= MIN_SIZE :
+                self.pathways.append(line.split()[0])
+                self.genes_sets.append(genes_implicated)
+        self.NB_sets = len(self.pathways)
+        print(self.NB_sets,"sets of genes used of the analysis")
 
-# Calculate the Enrichment score
-size = [len(p)for p in genes_sets] # number of genes implicated in each pathway
-ALL_index = [i for i in range(NB_patients) if patients[i] == 'ALL']
-AML_index = [i for i in range(NB_patients) if patients[i] == 'AML']
-dif_expr = []
+    def get_ES(self, patients = [], show = False,p = 1):
+        if len(patients) == 0 :
+            patients = self.patients
 
-for i in range(NB_genes):
-    expr_ALL = np.mean([data[i,j] for j in ALL_index])
-    expr_AML = np.mean([data[i,j] for j in AML_index])
-    dif_expr.append(expr_ALL-expr_AML) # negative values indicate a gene expressed (in average) more by AML patients
+        ALL_index = [i for i in range(self.NB_patients) if self.patients[i] == 'ALL']
+        AML_index = [i for i in range(self.NB_patients) if self.patients[i] == 'AML']
+        dif_expr = []
 
-# sorting the genes by correlation with phenotye
-index_sort = np.argsort(dif_expr)
-genes = [genes[i] for i in index_sort]
-data = np.matrix([data[i,].tolist()[0] for i in index_sort])
-dif_expr = [dif_expr[i] for i in index_sort]
-plt.plot(dif_expr)
-plt.show()
+        for i in range(self.NB_genes):
+            expr_ALL = np.mean([self.expr_matrix[i,j] for j in ALL_index])
+            expr_AML = np.mean([self.expr_matrix[i,j] for j in AML_index])
+            dif_expr.append(expr_ALL-expr_AML) # negative values indicate a gene expressed (in average) more by AML patients
 
-ES = []
-p = 1
-for set in range(NB_sets) :
-    N_H = size[set]
-    N_R = np.sum([ pow(abs(dif_expr[i]),p) for i in range(NB_genes) if genes[i] in genes_sets[set] ])
-    eq_0=[0]
-    for i in range(len(genes)):
-        if genes[i] in genes_sets[set]:
-            eq_0.append(eq_0[-1] + pow(abs(dif_expr[i]), p) / N_R)
-        else:
-            eq_0.append(eq_0[-1]-1/(NB_genes-N_H))
-    ES.append(np.max(np.abs(eq_0)))
-plt.hist(ES, 20)
-plt.show()
+        # sorting the genes by correlation with phenotye
+        index_sort = np.argsort(dif_expr)
+        genes_sorted = [self.genes[i] for i in index_sort]
+        dif_expr = [dif_expr[i] for i in index_sort]
+
+        ES = []
+        for set in self.genes_sets :
+            N_H = len(set)
+            N_R = np.sum([ pow(abs(dif_expr[i]),p) for i in range(self.NB_genes) if genes_sorted[i] in set ])
+            dist2_0 =[0] #distance to 0
+            for i in range(self.NB_genes):
+                if genes_sorted[i] in set :
+                    dist2_0.append(dist2_0[-1] + pow(abs(dif_expr[i]), p) / N_R)
+                else:
+                    dist2_0.append(dist2_0[-1]-1/(self.NB_genes-N_H))
+            ES.append(np.max(np.abs(dist2_0)))
+        if show :
+            plt.subplot(121)
+            plt.plot(dif_expr)
+            plt.subplot(122)
+            plt.hist(ES, 20)
+            plt.show()
+        return ES
+    
+
+test = gsea("leukemia.txt", "pathways.txt")
+scores = test.get_ES([], True, 1.0)
+#H0 = test.get_random_distrib(10, False, 1.0)
+
