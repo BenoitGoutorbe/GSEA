@@ -91,6 +91,17 @@ class gsea:
             plt.show()
         return ES0
 
+    def get_pvalue (self,scores,random_distrib) :
+        pval = []
+        size =  float(len(random_distrib))
+        for score in scores :
+            pval.append(np.sum(np.greater(random_distrib, score))/size)
+
+
+
+
 test = gsea("leukemia.txt", "pathways.txt")
 scores = test.get_ES([], True, 1.0)
 H0 = test.get_random_distrib(50, True, 1.0)
+pval = test.get_pvalue(scores, H0)
+print(pval)
