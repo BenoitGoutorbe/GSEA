@@ -106,9 +106,11 @@ class gsea:
             pval.append(np.sum(np.greater(random_distrib, score))/size)
         return pval
 
-test = gsea("leukemia.txt", "pathways.txt")
-scores = test.get_ES([], False, 1.0)
-H0 = test.get_random_distrib(10, True, 1.0)
-pval = test.get_pvalue(scores, H0)
-print(np.sort(pval))
+    def write_output(self,p_values, alpha) :
+        nb_output_sets = np.sum(np.less(p_values,alpha))
+        hits = np.argsort(p_values)[0:nb_output_sets]
+        for set in hits :
+            print (self.pathways[set]+'\t'+str(p_values[set]))
+
+
 
