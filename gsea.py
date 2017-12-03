@@ -70,8 +70,10 @@ class gsea:
         if show :
             plt.subplot(121)
             plt.plot(dif_expr)
+            plt.title("Genes expression distribution")
             plt.subplot(122)
             plt.hist(ES, 20)
+            plt.title("Enrichment scores")
             plt.show()
         return ES
 
@@ -85,10 +87,10 @@ class gsea:
             ES0 += distrib
         if show :
             plt.hist(ES0, 20)
+            plt.title("Random distribution scores for " + str(size*self.NB_sets) + " sets of genes")
             plt.show()
         return ES0
 
 test = gsea("leukemia.txt", "pathways.txt")
 scores = test.get_ES([], True, 1.0)
-H0 = test.get_random_distrib(10, True, 1.0)
-
+H0 = test.get_random_distrib(50, True, 1.0)
