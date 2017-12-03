@@ -42,8 +42,8 @@ class gsea:
         if len(patients) == 0 :
             patients = self.patients
 
-        ALL_index = [i for i in range(self.NB_patients) if self.patients[i] == 'ALL']
-        AML_index = [i for i in range(self.NB_patients) if self.patients[i] == 'AML']
+        ALL_index = [i for i in range(self.NB_patients) if patients[i] == 'ALL']
+        AML_index = [i for i in range(self.NB_patients) if patients[i] == 'AML']
         dif_expr = []
 
         for i in range(self.NB_genes):
@@ -74,9 +74,21 @@ class gsea:
             plt.hist(ES, 20)
             plt.show()
         return ES
-    
+
+
+    def get_random_distrib (self, size, show = True,p = 1):
+        random_patients = np.array(self.patients)
+        ES0 = []
+        for i in range(size):
+            np.random.shuffle(random_patients)
+            distrib = self.get_ES(random_patients, False, p)
+            ES0 += distrib
+        if show :
+            plt.hist(ES0, 20)
+            plt.show()
+        return ES0
 
 test = gsea("leukemia.txt", "pathways.txt")
 scores = test.get_ES([], True, 1.0)
-#H0 = test.get_random_distrib(10, False, 1.0)
+H0 = test.get_random_distrib(10, True, 1.0)
 
