@@ -2,7 +2,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 class gsea:
-    def __init__(self, expression_file, pathway_file):
+    def __init__(self, expression_file, pathway_file, output_file):
+        self.output_file = output_file
         # reading the expression file
         file = open(expression_file, "r")
         content = file.readlines()
@@ -51,6 +52,8 @@ class gsea:
             expr_AML = np.mean([self.expr_matrix[i,j] for j in AML_index])
             dif_expr.append(expr_ALL-expr_AML) # negative values indicate a gene expressed (in average) more by AML patients
 
+        self.correlation = list(dif_expr)
+
         # sorting the genes by correlation with phenotye
         index_sort = np.argsort(dif_expr)
         genes_sorted = [self.genes[i] for i in index_sort]
@@ -78,7 +81,7 @@ class gsea:
         return ES
 
 
-    def get_random_distrib (self, size, show = True,p = 1):
+    def get_random_distrib (self, size, show = True,p = 1, normalize = 1):
         random_patients = np.array(self.patients)
         ES0 = []
         print('Generating the random distribution...')
@@ -87,30 +90,43 @@ class gsea:
         cur = 0
         for i in range(size):
             np.random.shuffle(random_patients)
-            distrib = self.get_ES(random_patients, False, p)
-            ES0 += distrib
+            random_scores = self.get_ES(random_patients, False, p)
+            ES0.append(random_scores)
             if int(50.0 * i / size) != cur:
                 print((int(50.0 * i / size) - cur) * '=', end='', flush = True)
                 cur = int(50.0 * i / size)
         print((50 - cur) * '=')
+        ES_means = np.mean(ES0, axis=0)
+        distrib = []
+        for line in ES0 :
+            if normalize :
+                distrib += np.divide(line, ES_means).tolist()
+            else :
+                distrib += line
         if show :
-            plt.hist(ES0, 20)
+            plt.hist(distrib, 20)
             plt.title("Random distribution scores for " + str(size*self.NB_sets) + " sets of genes")
             plt.show()
-        return ES0
+        return (distrib, ES_means)
 
-    def get_pvalue (self,scores,random_distrib) :
+    def get_pvalue (self, scores, size_sample, normalize = True) :
+        (random_distrib, ES_means) = self.get_random_distrib(size_sample, True, 1, normalize)
+        if normalize :
+            Norm_ES = np.divide(scores, ES_means).tolist()
+        else :
+            Norm_ES = scores
         pval = []
-        size = float(len(random_distrib))
-        for score in scores :
-            pval.append(np.sum(np.greater(random_distrib, score))/size)
-        return pval
+        for score in Norm_ES :
+            pval.append(np.sum(np.greater(random_distrib, score))/size_sample)
+        return (pval, Norm_ES)
 
-    def write_output(self,p_values, alpha) :
-        nb_output_sets = np.sum(np.less(p_values,alpha))
+    def write_output(self, p_values,  norm_scores, alpha):
+        nb_output_sets = np.sum(np.less(p_values, alpha))
         hits = np.argsort(p_values)[0:nb_output_sets]
+        if nb_output_sets == 0 : print('No pathways such as p_value<alpha ')
         for set in hits :
-            print (self.pathways[set]+'\t'+str(p_values[set]))
+            print(self.pathways[set]+'      '+str(norm_scores[set])+'     '
+                  +str(p_values[set]))
 
 
 
