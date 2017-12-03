@@ -81,10 +81,18 @@ class gsea:
     def get_random_distrib (self, size, show = True,p = 1):
         random_patients = np.array(self.patients)
         ES0 = []
+        print('Generating the random distribution...')
+        print('0%[' + 50 * ' ' + ']100%')
+        print('   ', end='')
+        cur = 0
         for i in range(size):
             np.random.shuffle(random_patients)
             distrib = self.get_ES(random_patients, False, p)
             ES0 += distrib
+            if int(50.0 * i / size) != cur:
+                print((int(50.0 * i / size) - cur) * '=', end='', flush = True)
+                cur = int(50.0 * i / size)
+        print((50 - cur) * '=')
         if show :
             plt.hist(ES0, 20)
             plt.title("Random distribution scores for " + str(size*self.NB_sets) + " sets of genes")
@@ -93,15 +101,14 @@ class gsea:
 
     def get_pvalue (self,scores,random_distrib) :
         pval = []
-        size =  float(len(random_distrib))
+        size = float(len(random_distrib))
         for score in scores :
             pval.append(np.sum(np.greater(random_distrib, score))/size)
-
-
-
+        return pval
 
 test = gsea("leukemia.txt", "pathways.txt")
-scores = test.get_ES([], True, 1.0)
-H0 = test.get_random_distrib(50, True, 1.0)
+scores = test.get_ES([], False, 1.0)
+H0 = test.get_random_distrib(10, True, 1.0)
 pval = test.get_pvalue(scores, H0)
-print(pval)
+print(np.sort(pval))
+
