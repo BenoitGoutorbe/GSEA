@@ -1,43 +1,60 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import decimal
 
 class gsea:
-    def __init__(self, expression_file, pathway_file, output_file):
+    def __init__(self, expression_file, pathway_file, output_file,MIN_SIZE = 2):
         self.output_file = output_file
         # reading the expression file
         file = open(expression_file, "r")
         content = file.readlines()
         file.close()
 
-        self.patients = [] # patients category (ALL or AML)
-        self.genes = [] # name of the genes (headers)
-        expr = [] # table with expression levels
+        self.patients = []  # patients category (ALL or AML)
+        self.genes = []  # name of the genes (headers)
+        expr = []  # table with expression levels
         self.patients = content[0].split()[1:]
-        for line in content[1:] :
+        for line in content[1:]:
             self.genes.append(line.split()[0])
             expr.append([int(value) for value in line.split()[1:]])
-        self.NB_genes = len(self.genes)
-        self.NB_patients = len(self.patients)
-        print("Expression levels of", self.NB_genes, "genes for",self.NB_patients, "patients")
-
-        self.expr_matrix = np.matrix(expr)
 
         # reading the patwhays file
         file = open(pathway_file, "r")
         content = file.readlines()
         file.close()
+        print("Input data :" , len(self.patients) , "patients," ,
+              len(self.genes) , "genes, " , len(content) , "pathways")
 
-        MIN_SIZE = 15
-        self.pathways = [] # name of the pathways
-        self.genes_sets = [] # name of the genes implicated in each pathway
-        # NOTE : we keep only the genes sets with at least MIN_SIZE (15) genes for which we have expression data
-        for line in content :
+        self.pathways = []  # name of the pathways
+        self.genes_sets = []  # name of the genes implicated in each pathway
+        genes_presence = [0] * len(self.genes)
+        # NOTE : we keep only the genes sets with at least MIN_SIZE genes for which we have expression data
+        for line in content:
             genes_implicated = [g for g in line.split()[1:] if g in self.genes]
-            if len(genes_implicated) >= MIN_SIZE :
+            if len(genes_implicated) >= MIN_SIZE:
                 self.pathways.append(line.split()[0])
                 self.genes_sets.append(genes_implicated)
+                for g in genes_implicated :
+                    genes_presence[self.genes.index(g)] += 1
+        # clearing the unused genes
+        a = 0
+        for i in range(len(self.genes)) :
+            if genes_presence[i] == 0 :
+                del self.genes[i-a]
+                del expr[i-a]
+                a = a+1
+
+        self.expr_matrix = np.matrix(expr)
+
+        self.index_genes_implicated = []
+        for set in self.genes_sets :
+            self.index_genes_implicated.append([self.genes.index(g) for g in set])
+
+        self.NB_patients = len(self.patients)
+        self.NB_genes = len(self.genes)
         self.NB_sets = len(self.pathways)
-        print(self.NB_sets,"sets of genes used of the analysis")
+        print("Reduced data (only pathways with at least",MIN_SIZE,"genes and only genes belonging to a selected pathway)")
+        print(self.NB_patients , "patients," , self.NB_genes , "genes, " , self.NB_sets , "pathways")
 
     def get_ES(self, patients = [], show = False,p = 1):
         if len(patients) == 0 :
@@ -53,7 +70,6 @@ class gsea:
             dif_expr.append(expr_ALL-expr_AML) # negative values indicate a gene expressed (in average) more by AML patients
 
         self.correlation = list(dif_expr)
-
         # sorting the genes by correlation with phenotye
         index_sort = np.argsort(dif_expr)
         genes_sorted = [self.genes[i] for i in index_sort]
@@ -62,13 +78,13 @@ class gsea:
         ES = []
         for set in self.genes_sets :
             N_H = len(set)
-            N_R = np.sum([ pow(abs(dif_expr[i]),p) for i in range(self.NB_genes) if genes_sorted[i] in set ])
+            N_R = np.sum([ pow(abs(dif_expr[i]),p) for i in range(self.NB_genes) if genes_sorted[i] in set])
             dist2_0 =[0] #distance to 0
             for i in range(self.NB_genes):
                 if genes_sorted[i] in set :
                     dist2_0.append(dist2_0[-1] + pow(abs(dif_expr[i]), p) / N_R)
                 else:
-                    dist2_0.append(dist2_0[-1]-1/(self.NB_genes-N_H))
+                    dist2_0.append(dist2_0[-1] - 1.0/(self.NB_genes-N_H) )
             ES.append(np.max(np.abs(dist2_0)))
         if show :
             plt.subplot(121)
@@ -80,8 +96,55 @@ class gsea:
             plt.show()
         return ES
 
+    def get_ES_fast(self, patients = [], show = False,p = 1):
+        if len(patients) == 0 :
+            patients = self.patients
 
-    def get_random_distrib (self, size, show = True,p = 1, normalize = 1):
+        ALL_index = [i for i in range(self.NB_patients) if patients[i] == 'ALL']
+        AML_index = [i for i in range(self.NB_patients) if patients[i] == 'AML']
+        dif_expr = []
+
+        for i in range(self.NB_genes):
+            expr_ALL = np.mean([self.expr_matrix[i,j] for j in ALL_index])
+            expr_AML = np.mean([self.expr_matrix[i,j] for j in AML_index])
+            dif_expr.append(expr_ALL-expr_AML) # negative values indicate a gene expressed (in average) more by AML patients
+
+        self.correlation = list(dif_expr)
+        # sorting the genes by correlation with phenotye
+        index_sort = np.argsort(dif_expr).tolist()
+        positions = [index_sort.index(i) for i in range(self.NB_genes)]
+        dif_expr_sorted = [dif_expr[i] for i in index_sort]
+        ES = []
+
+        for set in range(self.NB_sets) :
+            N_H = len(self.genes_sets[set])
+            N_R = np.sum(pow(abs(dif_expr[i]),p) for i in self.index_genes_implicated[set])
+            penalty = -1.0/(self.NB_genes-N_H)
+            positions_genes_implicated = np.sort([positions[i] for i in self.index_genes_implicated[set]]).tolist()
+            path = [0]
+            if positions_genes_implicated[0] != 0 :
+                path.append((positions_genes_implicated[0])* penalty)
+                path.append(path[-1] + pow(abs(dif_expr_sorted[positions_genes_implicated[0]]), p) / N_R)
+            else :
+                path = [pow(abs(dif_expr[positions_genes_implicated[0]]), p) /N_R]
+            for i in range(1,len(positions_genes_implicated)) :
+                path.append(path[-1]+(positions_genes_implicated[i]-positions_genes_implicated[i-1]-1)*penalty)
+                path.append(path[-1] + pow(abs(dif_expr_sorted[positions_genes_implicated[i]]), p) /N_R)
+            path.append(path[-1]+float((self.NB_genes-positions_genes_implicated[-1]-1)*penalty))
+            ES.append(np.max(np.abs(path)))
+
+        if show :
+            plt.subplot(121)
+            plt.plot(np.sort(dif_expr))
+            plt.title("Genes expression distribution")
+            plt.subplot(122)
+            plt.hist(ES, 20)
+            plt.title("Enrichment scores")
+            plt.show()
+        return ES
+
+
+    def get_random_distrib (self, size,p = 1, normalize = 1):
         random_patients = np.array(self.patients)
         ES0 = []
         print('Generating the random distribution...')
@@ -90,7 +153,7 @@ class gsea:
         cur = 0
         for i in range(size):
             np.random.shuffle(random_patients)
-            random_scores = self.get_ES(random_patients, False, p)
+            random_scores = self.get_ES_fast(random_patients, False, p)
             ES0.append(random_scores)
             if int(50.0 * i / size) != cur:
                 print((int(50.0 * i / size) - cur) * '=', end='', flush = True)
@@ -103,30 +166,33 @@ class gsea:
                 distrib += np.divide(line, ES_means).tolist()
             else :
                 distrib += line
-        if show :
-            plt.hist(distrib, 20)
-            plt.title("Random distribution scores for " + str(size*self.NB_sets) + " sets of genes")
-            plt.show()
+
         return (distrib, ES_means)
 
-    def get_pvalue (self, scores, size_sample, normalize = True) :
-        (random_distrib, ES_means) = self.get_random_distrib(size_sample, True, 1, normalize)
+    def get_pvalue (self, scores, size_sample,p=1, normalize = True, show = False) :
+        (random_distrib, ES_means) = self.get_random_distrib(size_sample, p, normalize)
         if normalize :
-            Norm_ES = np.divide(scores, ES_means).tolist()
+            NES = np.divide(scores, ES_means).tolist()
         else :
-            Norm_ES = scores
+            NES = scores
         pval = []
-        for score in Norm_ES :
+        for score in NES:
             pval.append(np.sum(np.greater(random_distrib, score))/size_sample)
-        return (pval, Norm_ES)
+        if show :
+            xmin, xmax = np.min(random_distrib)-0.2, np.max(random_distrib)+0.2
+            x = np.arange(xmin,xmax,0.05).tolist()
+            y = [ sum([val >= xi and val < xi+0.05 for val in random_distrib]) for xi in x]
+            y = (np.array(y) / size_sample).tolist()
+            plt.plot(np.array(x)+0.025,y, 'r--')
+            plt.title("Random distribution scores for " + str(size_sample*self.NB_sets) + " sets of genes")
+            plt.hist(NES, bins = x, )
+            plt.show()
+        return (pval, NES)
 
     def write_output(self, p_values,  norm_scores, alpha):
         nb_output_sets = np.sum(np.less(p_values, alpha))
         hits = np.argsort(p_values)[0:nb_output_sets]
         if nb_output_sets == 0 : print('No pathways such as p_value<alpha ')
         for set in hits :
-            print(self.pathways[set]+'      '+str(norm_scores[set])+'     '
-                  +str(p_values[set]))
-
-
-
+            mean_correlation = np.mean([self.correlation[g] for g in self.index_genes_implicated[set]])
+            print(self.pathways[set],'  ',mean_correlation,'  ',norm_scores[set],'  ',p_values[set])
