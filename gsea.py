@@ -169,12 +169,12 @@ class gsea:
 
         return (distrib, ES_means)
 
-    def get_pvalue (self, scores, size_sample,p=1, normalize = True, show = False) :
+    def get_pvalue (self, ES, size_sample,p=1, normalize = True, show = False) :
         (random_distrib, ES_means) = self.get_random_distrib(size_sample, p, normalize)
         if normalize :
-            NES = np.divide(scores, ES_means).tolist()
+            NES = np.divide(ES, ES_means).tolist()
         else :
-            NES = scores
+            NES = ES
         pval = []
         for score in NES:
             pval.append(np.sum(np.greater(random_distrib, score))/size_sample)
@@ -185,14 +185,20 @@ class gsea:
             y = (np.array(y) / size_sample).tolist()
             plt.plot(np.array(x)+0.025,y, 'r--')
             plt.title("Random distribution scores for " + str(size_sample*self.NB_sets) + " sets of genes")
-            plt.hist(NES, bins = x, )
-            plt.show()
+            plt.hist(NES, bins=x)
+            plt.savefig('distrib.png')
         return (pval, NES)
 
-    def write_output(self, p_values,  norm_scores, alpha):
-        nb_output_sets = np.sum(np.less(p_values, alpha))
+    def write_output(self, p_values,  norm_scores, nb_output_sets):
+        file = open(self.output_file, 'w')
+        file.write("Pathway p-value NES Leukemia Correlation \n")
         hits = np.argsort(p_values)[0:nb_output_sets]
-        if nb_output_sets == 0 : print('No pathways such as p_value<alpha ')
         for set in hits :
             mean_correlation = np.mean([self.correlation[g] for g in self.index_genes_implicated[set]])
-            print(self.pathways[set],'  ',mean_correlation,'  ',norm_scores[set],'  ',p_values[set])
+            if mean_correlation < 0 :
+                leu = "\tAML\t"
+            else :
+                leu = "\tALL\t"
+            print(self.pathways[set]+"\t"+str(p_values[set])+"\t"+str(norm_scores[set])+leu+ str(mean_correlation))
+            file.write(self.pathways[set]+"\t"+str(p_values[set])+"\t"+str(norm_scores[set])+leu+ str(mean_correlation)+" \n")
+

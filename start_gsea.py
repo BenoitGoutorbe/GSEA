@@ -15,7 +15,7 @@ print("comparaison des 2 methodes :" )
 
 print("scores      (",round(t1,3),"s ) :",ES1[:10])
 print("scores fast (",round(t2,3),"s ) :",ES2[:10])
-pval, norm_scores = my_gsea.get_pvalue(ES1,size_sample=50, p = 1.0, normalize=True, show=True)
-my_gsea.write_output(pval, norm_scores, 0.10)
+pval, norm_scores = my_gsea.get_pvalue(ES1,size_sample=1000, p = 1.0, normalize=True, show=True)
+my_gsea.write_output(pval, norm_scores, 20)
 
 
