@@ -109,7 +109,7 @@ class gsea:
         for i in range(self.NB_genes):
             expr_cat1 = np.mean([self.expr_matrix[i, j] for j in cat1_index])
             expr_cat2 = np.mean([self.expr_matrix[i, j] for j in cat2_index])
-            dif_expr.append(expr_cat1 - expr_cat2)  # negative values indicate a gene expressed (in average) more by cat1
+            dif_expr.append(expr_cat1 - expr_cat2)  # negative values indicate a gene expressed (in average) more by cat2
         self.correlation = list(dif_expr)
         # sorting the genes by correlation with phenotye
         index_sort = np.argsort(dif_expr).tolist()
@@ -214,10 +214,11 @@ class gsea:
             print('Creating the histogram ...', end = '', flush=True)
             xmin, xmax = np.min(random_distrib)-0.2, np.max(random_distrib)+0.2
             x = np.arange(xmin,xmax,0.1).tolist()
-            y = [ sum([val >= xi and val < xi+0.1 for val in random_distrib]) for xi in x] #really slow
-            y = (np.array(y) / size_sample).tolist()
-            plt.plot(np.array(x)+0.05,y, 'r--', label = 'Null distribution')
-            plt.hist(NES, bins=x, label= 'Observed NES')
+            n, bins, patches = plt.hist(random_distrib,bins=x)
+            plt.figure()
+            y = (np.array(n) / size_sample).tolist()
+            plt.hist(NES, bins=x, label='Observed NES')
+            plt.plot(np.array(x[:len(x)-1])+0.05,y, 'r--', label = 'Null distribution')
             plt.xlabel('Normalized Enrichment Scores')
             plt.ylabel('Number of sets')
             plt.legend()
@@ -227,7 +228,7 @@ class gsea:
 
     def write_output(self, p_values, norm_scores):
         file = open(self.output_file+".txt", 'w')
-        file.write("p-value\tNES\tOverExpressingCategory\tPathway")
+        file.write("p-value\tNES\tOverExpressingCategory\tPathway\n")
         hits = np.argsort(p_values).tolist()
         for set in hits :
             mean_correlation = np.mean([self.correlation[g] for g in self.index_genes_implicated[set]])
