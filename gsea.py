@@ -98,6 +98,7 @@ class gsea:
 
     def get_ES_fast(self, patients = [], show = False,p = 1):
         if len(patients) == 0 :
+            remind = True
             patients = self.patients
 
         ALL_index = [i for i in range(self.NB_patients) if patients[i] == 'ALL']
@@ -131,7 +132,9 @@ class gsea:
                 path.append(path[-1]+(positions_genes_implicated[i]-positions_genes_implicated[i-1]-1)*penalty)
                 path.append(path[-1] + pow(abs(dif_expr_sorted[positions_genes_implicated[i]]), p) /N_R)
             path.append(path[-1]+float((self.NB_genes-positions_genes_implicated[-1]-1)*penalty))
-            ES.append(np.max(np.abs(path)))
+            max_deviation_position = np.argmax(np.abs(path))
+            ES.append(path[max_deviation_position])
+
 
         if show :
             plt.subplot(121)
@@ -144,7 +147,7 @@ class gsea:
         return ES
 
 
-    def get_random_distrib (self, size,p = 1, normalize = 1):
+    def get_random_distrib (self, size,p = 1, normalize = True):
         random_patients = np.array(self.patients)
         ES0 = []
         print('Generating the random distribution...')
@@ -159,40 +162,70 @@ class gsea:
                 print((int(50.0 * i / size) - cur) * '=', end='', flush = True)
                 cur = int(50.0 * i / size)
         print((50 - cur) * '=')
-        ES_means = np.mean(ES0, axis=0)
-        distrib = []
-        for line in ES0 :
-            if normalize :
-                distrib += np.divide(line, ES_means).tolist()
-            else :
-                distrib += line
+        if normalize : print('Normalization...', end = '', flush = True)
+        ES_pos_means = []
+        ES_neg_means = []
+        for j in range(self.NB_sets):
+            pos = []
+            neg = []
+            for i in range(size) :
+                if  ES0[i][j] > 0 :
+                    pos.append(ES0[i][j])
+                else :
+                    neg.append(ES0[i][j])
+            if len(pos) == 0 :
+                pos.append(1.0)
+            if len(neg) == 0 :
+                neg.append(-1.0)
+            ES_pos_means.append(np.mean(pos))
+            ES_neg_means.append(-np.mean(neg))
 
-        return (distrib, ES_means)
+        distrib = []
+        for ES in ES0 :
+            if normalize :
+                for i in range(self.NB_sets) :
+                    if ES[i] >0 :
+                        distrib.append(ES[i]/ES_pos_means[i])
+                    else :
+                        distrib.append(ES[i] / ES_neg_means[i])
+            else :
+                distrib += ES
+        return (distrib, ES_pos_means, ES_neg_means)
 
     def get_pvalue (self, ES, size_sample,p=1, normalize = True, show = False) :
-        (random_distrib, ES_means) = self.get_random_distrib(size_sample, p, normalize)
+        random_distrib, ES_pos_means,ES_neg_means = self.get_random_distrib(size_sample, p, normalize)
         if normalize :
-            NES = np.divide(ES, ES_means).tolist()
+            NES= []
+            for i in range(self.NB_sets) :
+                if ES[i] > 0 :
+                    NES.append( ES[i] / ES_pos_means[i])
+                else :
+                    NES.append(ES[i] / ES_neg_means[i])
         else :
             NES = ES
         pval = []
-        for score in NES:
-            pval.append(np.sum(np.greater(random_distrib, score))/size_sample)
+        for i in range(self.NB_sets) :
+            if NES[i] > 0 :
+                pval.append(np.sum(np.greater(random_distrib,NES[i])) / len(random_distrib))
+            else :
+                pval.append(np.sum(np.less(random_distrib,NES[i])) / len(random_distrib))
+        if normalize: print('  DONE')
         if show :
             xmin, xmax = np.min(random_distrib)-0.2, np.max(random_distrib)+0.2
-            x = np.arange(xmin,xmax,0.05).tolist()
-            y = [ sum([val >= xi and val < xi+0.05 for val in random_distrib]) for xi in x]
+            x = np.arange(xmin,xmax,0.1).tolist()
+            y = [ sum([val >= xi and val < xi+0.1 for val in random_distrib]) for xi in x]
             y = (np.array(y) / size_sample).tolist()
-            plt.plot(np.array(x)+0.025,y, 'r--')
+            plt.plot(np.array(x)+0.05,y, 'r--')
             plt.title("Random distribution scores for " + str(size_sample*self.NB_sets) + " sets of genes")
             plt.hist(NES, bins=x)
-            plt.savefig('distrib.png')
+            plt.savefig('distribution.png')
         return (pval, NES)
 
-    def write_output(self, p_values,  norm_scores, nb_output_sets):
+    def write_output(self, p_values,  norm_scores, alpha = 0.05):
         file = open(self.output_file, 'w')
         file.write("Pathway p-value NES Leukemia Correlation \n")
-        hits = np.argsort(p_values)[0:nb_output_sets]
+        nb_hits = max(10, len(np.argwhere(np.array(p_values) < alpha)))
+        hits = np.argsort(p_values).tolist()[:nb_hits]
         for set in hits :
             mean_correlation = np.mean([self.correlation[g] for g in self.index_genes_implicated[set]])
             if mean_correlation < 0 :
@@ -201,4 +234,5 @@ class gsea:
                 leu = "\tALL\t"
             print(self.pathways[set]+"\t"+str(p_values[set])+"\t"+str(norm_scores[set])+leu+ str(mean_correlation))
             file.write(self.pathways[set]+"\t"+str(p_values[set])+"\t"+str(norm_scores[set])+leu+ str(mean_correlation)+" \n")
-
+        file.close()
+        if p_values[hits[0]] >= alpha: print('NO SETS WITH p-value < ', alpha, '  ->  WE SAVED THE 10 BEST HITS')
