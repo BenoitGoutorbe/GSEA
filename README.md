@@ -13,3 +13,7 @@ Using as a library :
 * MIN_SIZE (in the __init__) : minimum size of considered pathway (15 in the reference paper) 
 * size_sample (in get_pvalue) : number of simulation de generate the null distribution
 * show (in get_pvalue) : Create (or not) an figure saved as 'output_GSEA.png'
+
+OUTPUT :
+.txt : [p-value	NES	OverExpressingCategory	Pathway] for each set of the analysis, sorted by p-value
+.png : figure of the observed NES and the null distribution
